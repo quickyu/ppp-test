@@ -1,0 +1,4 @@
+.vscode
+*.o
+rtkrcv/gcc/rtkrcv
+
