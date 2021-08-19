@@ -1,4 +1,6 @@
 .vscode
 *.o
 rtkrcv/gcc/rtkrcv
+*.nav
+
 
