@@ -1549,7 +1549,7 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
         case SYS_GLO: np=5; ni= 8; nj= 0; offp=  0; break;
         case SYS_GAL: np=6; ni=10; nj= 0; offp=  0; break;
         case SYS_QZS: np=4; ni= 8; nj= 0; offp=192; break;
-        case SYS_CMP: np=6; ni=10; nj=24; offp=  1; break;
+        case SYS_CMP: np=6; ni=10; nj=8; offp=  0; break;
         case SYS_SBS: np=6; ni= 9; nj=24; offp=120; break;
         default: return sync?0:10;
     }
@@ -1605,7 +1605,7 @@ static int decode_ssr2(rtcm_t *rtcm, int sys, int subtype)
         case SYS_GLO: np=5; offp=  0; break;
         case SYS_GAL: np=6; offp=  0; break;
         case SYS_QZS: np=4; offp=192; break;
-        case SYS_CMP: np=6; offp=  1; break;
+        case SYS_CMP: np=6; offp=  0; break;
         case SYS_SBS: np=6; offp=120; break;
         default: return sync?0:10;
     }
@@ -1653,7 +1653,7 @@ static int decode_ssr3(rtcm_t *rtcm, int sys, int subtype)
         case SYS_GLO: np=5; offp=  0; sigs=ssr_sig_glo; break;
         case SYS_GAL: np=6; offp=  0; sigs=ssr_sig_gal; break;
         case SYS_QZS: np=4; offp=192; sigs=ssr_sig_qzs; break;
-        case SYS_CMP: np=6; offp=  1; sigs=ssr_sig_cmp; break;
+        case SYS_CMP: np=6; offp=  0; sigs=ssr_sig_cmp; break;
         case SYS_SBS: np=6; offp=120; sigs=ssr_sig_sbs; break;
         default: return sync?0:10;
     }
