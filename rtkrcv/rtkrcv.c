@@ -952,9 +952,27 @@ static void prstream(vt_t *vt)
     }
 }
 /* print ssr correction ------------------------------------------------------*/
+struct ssr_sig {
+    uint8_t signal;
+    char *str;
+};
+
+static struct ssr_sig gps_signal[] = {
+    {CODE_L1C, "1C"}, {CODE_L1P, "1P"}, {CODE_L1W, "1W"}, {CODE_L1S, "1S"},
+    {CODE_L1L, "1L"}, {CODE_L2C, "2C"}, {CODE_L2D, "2D"}, {CODE_L2S, "2S"},
+    {CODE_L2L, "2L"}, {CODE_L2X, "2X"}, {CODE_L2P, "2P"}, {CODE_L2W, "2W"},
+    {CODE_L5I, "5I"}, {CODE_L5Q, "5Q"}
+};
+
+static struct ssr_sig bds_signal[] = {
+    {CODE_L2I, "2I"}, {CODE_L2Q, "2Q"}, {CODE_L6I, "6I"}, {CODE_L6Q, "6Q"}, 
+    {CODE_L7I, "7I"}, {CODE_L7Q, "7Q"}, {CODE_L1D, "1D"}, {CODE_L1P, "1P"}, 
+    {CODE_L5D, "5D"}, {CODE_L5P, "5P"}, {CODE_L1A, "1A"}, {CODE_L6A, "6A"}
+};
+
 static void prssr(vt_t *vt)
 {
-    static char buff[128*MAXSAT];
+    static char buff[256*MAXSAT];
     gtime_t time;
     ssr_t ssr[MAXSAT];
     int i,valid;
@@ -977,12 +995,32 @@ static void prssr(vt_t *vt)
         valid=fabs(timediff(time,ssr[i].t0[0]))<=1800.0;
         time2str(ssr[i].t0[0],tstr,0);
         p+=sprintf(p,"%3s %3s %3.0f %3d %3d %19s %6.3f %6.3f %6.3f %6.3f %6.3f "
-                   "%6.3f %8.3f %6.3f %6.4f %6.3f\n",
+                   "%6.3f %8.3f %6.3f %6.4f %6.3f   ",
                    id,valid?"OK":"-",ssr[i].udi[0],ssr[i].iode,ssr[i].ura,tstr,
                    ssr[i].deph[0],ssr[i].deph[1],ssr[i].deph[2],
-                   ssr[i].ddeph[0]*1E3,ssr[i].ddeph[1]*1E3,ssr[i].ddeph[2]*1E3,
-                   ssr[i].dclk[0],ssr[i].dclk[1]*1E3,ssr[i].dclk[2]*1E3,
+                   ssr[i].ddeph[0],ssr[i].ddeph[1],ssr[i].ddeph[2],
+                   ssr[i].dclk[0],ssr[i].dclk[1],ssr[i].dclk[2],
                    ssr[i].hrclk);
+
+        int sig_num = 0;
+        struct ssr_sig *sig_array = NULL;
+
+        if (id[0] == 'G') {
+            sig_num = sizeof(gps_signal)/sizeof(gps_signal[0]);
+            sig_array = gps_signal;
+        } else if (id[0] == 'C') {
+            sig_num =  sizeof(bds_signal)/sizeof(bds_signal[0]);  
+            sig_array = bds_signal;
+        }    
+
+        for (int idx = 0; idx < sig_num; idx++) {
+            uint8_t sig = sig_array[idx].signal;
+            if (ssr[i].cbias[sig-1] != 0.0f) {
+                p += sprintf(p, "%s:%6.3f  ", sig_array[idx].str, ssr[i].cbias[sig-1]);
+            }    
+        }
+
+        p += sprintf(p, "\n");       
     }
     vt_puts(vt,buff);
 }
