@@ -112,9 +112,9 @@ const char *msm_sig_sbs[32]={
 };
 const char *msm_sig_cmp[32]={
     /* BeiDou: ref [17] table 3.5-108 */
-    ""  ,"2I","2Q","2X",""  ,""  ,""  ,"6I","6Q","6X",""  ,""  ,
-    ""  ,"7I","7Q","7X",""  ,""  ,""  ,""  ,""  ,""  ,""  ,""  ,
-    ""  ,""  ,""  ,""  ,""  ,""  ,""  ,""
+    ""  ,"2I","2Q","2X",""  ,""  ,""  ,"6I","6Q","6X",""  ,""  ,  /* 1 -- 12 */
+    ""  ,"7I","7Q","7X",""  ,""  ,""  ,""  ,""  ,"5D"  ,"5P"  ,"5X"  ,  /* 13 -- 24 */
+    "7D"  ,""  ,""  ,""  ,""  ,"1D"  ,"1P"  ,"1X"                         /* 25 -- 32 */
 };
 const char *msm_sig_irn[32]={
     /* NavIC/IRNSS: ref [17] table 3.5-108.3 */
@@ -2680,6 +2680,9 @@ extern int decode_rtcm3(rtcm_t *rtcm)
         case   14: ret=decode_ssr7(rtcm,SYS_CMP,0); break; /* tentative */
         case 4073: ret=decode_type4073(rtcm); break;
         case 4076: ret=decode_type4076(rtcm); break;
+        default: 
+            trace(4, "decode_rtcm3: unknow message type %d\n", type);
+            break;
     }
     if (ret>=0) {
         if      (1001<=type&&type<=1299) rtcm->nmsg3[type-1000]++; /*   1-299 */
