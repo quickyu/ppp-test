@@ -162,7 +162,9 @@ static void update_eph(rtksvr_t *svr, nav_t *nav, int ephsat, int ephset,
     geph_t *geph1,*geph2,*geph3;
     int prn;
     
-    if (satsys(ephsat,&prn)!=SYS_GLO) {
+    int sys = satsys(ephsat,&prn);
+
+    if (sys != SYS_GLO) {
         if (!svr->navsel||svr->navsel==index+1) {
             /* svr->nav.eph={current_set1,current_set2,prev_set1,prev_set2} */
             eph1=nav->eph+ephsat-1+MAXSAT*ephset;         /* received */
@@ -176,6 +178,15 @@ static void update_eph(rtksvr_t *svr, nav_t *nav, int ephsat, int ephset,
                  timediff(eph1->toc,eph2->toc)!=0.0)) {
                 *eph3=*eph2; /* current ->previous */
                 *eph2=*eph1; /* received->current */
+
+                if (sys == SYS_CMP) {
+                    char toe[64], toc[64], ttr[64], id[10];
+                    satno2id(ephsat, id);
+                    time2str(eph2->toe, toe, 0);
+                    time2str(eph2->toc, toc, 0);
+                    time2str(eph2->ttr, ttr, 0);
+                    trace(1, "BDS ephemeris updated, %s  %s  toe: %s  toc: %s\n", id, ttr, toe, toc);
+                }
             }
         }
         svr->nmsg[index][1]++;
@@ -298,6 +309,23 @@ static void update_ssr(rtksvr_t *svr, int index)
                 continue;
             }
         }
+
+        if (sys == SYS_CMP) {
+            int cur_toe = svr->nav.ssr[i].iode;
+            int cur_iod = svr->nav.ssr[i].iodcrc;
+            int new_toe = svr->rtcm[index].ssr[i].iode;
+            int new_iod = svr->rtcm[index].ssr[i].iodcrc;
+
+            if (cur_toe != new_toe || cur_iod != new_iod) {
+                char id[10], t0[64];
+                satno2id(i+1, id);
+                time2str(svr->rtcm[index].ssr[i].t0[0], t0, 0);
+
+                trace(1, "BDS ssr updated, %s  %s  ctoe %d  ciod %d  ntoe %d  niod %d\n",
+                    id, t0, cur_toe, cur_iod, new_toe, new_iod);
+            }
+        }
+
         svr->nav.ssr[i]=svr->rtcm[index].ssr[i];
     }
     svr->nmsg[index][7]++;
