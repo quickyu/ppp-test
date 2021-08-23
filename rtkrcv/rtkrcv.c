@@ -1104,7 +1104,7 @@ static void cmd_satellite(char **args, int narg, vt_t *vt)
 /* observ command ------------------------------------------------------------*/
 static void cmd_observ(char **args, int narg, vt_t *vt)
 {
-    int i,nf=2,cycle=0;
+    int i,nf=4,cycle=0;
     
     trace(3,"cmd_observ:\n");
     
