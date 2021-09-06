@@ -142,9 +142,9 @@ const uint8_t ssr_sig_qzs[32]={
            0,CODE_L6E
 };
 const uint8_t ssr_sig_cmp[32]={
-    CODE_L2I,CODE_L2Q,       0,CODE_L6I,CODE_L6Q,       0,CODE_L7I,CODE_L7Q,
-           0,CODE_L1D,CODE_L1P,       0,CODE_L5D,CODE_L5P,       0,CODE_L1A,
-           0,       0,CODE_L6A
+    CODE_L2I, CODE_L2Q,       0, CODE_L6I, CODE_L6Q,       0, CODE_L7I, CODE_L7Q,
+           0, CODE_L1D, CODE_L1P, CODE_L1X, CODE_L5D, CODE_L5P, CODE_L5X, CODE_L1A,
+           0,       0, CODE_L6A
 };
 const uint8_t ssr_sig_sbs[32]={
     CODE_L1C,CODE_L5I,CODE_L5Q
@@ -1576,8 +1576,8 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
         rtcm->ssr[sat-1].t0 [0]=rtcm->time;
         rtcm->ssr[sat-1].udi[0]=udint;
         rtcm->ssr[sat-1].iod[0]=iod;
-        rtcm->ssr[sat-1].iode=iode;     /* SBAS/BDS: toe/t0 modulo */
-        rtcm->ssr[sat-1].iodcrc=iodcrc; /* SBAS/BDS: IOD CRC */
+        rtcm->ssr[sat-1].iode=iode;     /* BDS: toe */
+        rtcm->ssr[sat-1].iodcrc=iodcrc; /* BDS: iod */
         rtcm->ssr[sat-1].refd=refd;
         
         for (k=0;k<3;k++) {
