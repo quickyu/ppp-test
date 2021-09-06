@@ -814,36 +814,59 @@ static void probserv(vt_t *vt, int nf)
 {
     obsd_t obs[MAXOBS*2];
     char tstr[64],id[32];
-    int i,j,n=0,frq[]={1,2,5,7,8,6,9};
+    int i, j, n = 0, frq[] = {1,2,5,7,8,6,9};
     
-    trace(4,"probserv:\n");
+    trace(4, "probserv:\n");
     
     rtksvrlock(&svr);
-    for (i=0;i<svr.obs[0][0].n&&n<MAXOBS*2;i++) {
-        obs[n++]=svr.obs[0][0].data[i];
+    for (i = 0; i < svr.obs[0][0].n && n < MAXOBS*2; i++) {
+        obs[n++] = svr.obs[0][0].data[i];
     }
-    for (i=0;i<svr.obs[1][0].n&&n<MAXOBS*2;i++) {
-        obs[n++]=svr.obs[1][0].data[i];
+
+    for (i = 0; i < svr.obs[1][0].n && n < MAXOBS*2; i++) {
+        obs[n++] = svr.obs[1][0].data[i];
     }
     rtksvrunlock(&svr);
     
-    if (nf<=0||nf>NFREQ) nf=NFREQ;
-    vt_printf(vt,"\n%s%-22s %3s %s",ESC_BOLD,"      TIME(GPST)","SAT","R");
-    for (i=0;i<nf;i++) vt_printf(vt,"        P%d(m)" ,frq[i]);
-    for (i=0;i<nf;i++) vt_printf(vt,"       L%d(cyc)",frq[i]);
-    for (i=0;i<nf;i++) vt_printf(vt,"  D%d(Hz)"      ,frq[i]);
-    for (i=0;i<nf;i++) vt_printf(vt," S%d"           ,frq[i]);
-    vt_printf(vt," LLI%s\n",ESC_RESET);
-    for (i=0;i<n;i++) {
-        time2str(obs[i].time,tstr,2);
-        satno2id(obs[i].sat,id);
-        vt_printf(vt,"%s %3s %d",tstr,id,obs[i].rcv);
-        for (j=0;j<nf;j++) vt_printf(vt,"%13.3f",obs[i].P[j]);
-        for (j=0;j<nf;j++) vt_printf(vt,"%14.3f",obs[i].L[j]);
-        for (j=0;j<nf;j++) vt_printf(vt,"%8.1f" ,obs[i].D[j]);
-        for (j=0;j<nf;j++) vt_printf(vt,"%3.0f" ,obs[i].SNR[j]*SNR_UNIT);
-        for (j=0;j<nf;j++) vt_printf(vt,"%2d"   ,obs[i].LLI[j]);
-        vt_printf(vt,"\n");
+    if (nf <= 0 || nf > NFREQ) 
+        nf = NFREQ;
+        
+    vt_printf(vt, "\n%s%-22s %3s %s", ESC_BOLD, "      TIME(GPST)", "SAT","R");
+    for (i = 0; i < nf; i++) 
+        vt_printf(vt, "        P%d(m)", frq[i]);
+    for (i = 0; i < nf; i++) 
+        vt_printf(vt, "       L%d(cyc)", frq[i]);
+    for (i = 0; i < nf; i++) 
+        vt_printf(vt, "  D%d(Hz)", frq[i]);
+    for (i = 0; i < nf; i++) 
+        vt_printf(vt, " S%d", frq[i]);
+    vt_printf(vt, " LLI");
+    vt_printf(vt, "  CODE%s\n", ESC_RESET);
+
+    for (i = 0; i < n; i++) {
+        time2str(obs[i].time, tstr, 2);
+        satno2id(obs[i].sat, id);
+        vt_printf(vt, "%s %3s %d", tstr, id, obs[i].rcv);
+
+        for (j = 0; j < nf; j++) 
+            vt_printf(vt, "%13.3f", obs[i].P[j]);
+        for (j = 0; j < nf; j++) 
+            vt_printf(vt, "%14.3f", obs[i].L[j]);
+        for (j = 0; j < nf; j++) 
+            vt_printf(vt, "%8.1f", obs[i].D[j]);
+        for (j = 0; j < nf; j++) 
+            vt_printf(vt, "%3.0f", obs[i].SNR[j]*SNR_UNIT);
+        for (j = 0; j < nf; j++) 
+            vt_printf(vt, "%2d", obs[i].LLI[j]);
+        vt_printf(vt, "  ");    
+        for (j = 0; j < nf; j++) {
+            char *s = code2obs(obs[i].code[j]);
+            if (*s == '\0')
+                vt_printf(vt, "   "); 
+            else     
+                vt_printf(vt, "%s ", s);    
+        }    
+        vt_printf(vt, "\n");
     }
 }
 /* print navigation data -----------------------------------------------------*/
@@ -967,7 +990,8 @@ static struct ssr_sig gps_signal[] = {
 static struct ssr_sig bds_signal[] = {
     {CODE_L2I, "2I"}, {CODE_L2Q, "2Q"}, {CODE_L6I, "6I"}, {CODE_L6Q, "6Q"}, 
     {CODE_L7I, "7I"}, {CODE_L7Q, "7Q"}, {CODE_L1D, "1D"}, {CODE_L1P, "1P"}, 
-    {CODE_L5D, "5D"}, {CODE_L5P, "5P"}, {CODE_L1A, "1A"}, {CODE_L6A, "6A"}
+    {CODE_L1X, "1X"}, {CODE_L5D, "5D"}, {CODE_L5P, "5P"}, {CODE_L5X, "5X"}, 
+    {CODE_L1A, "1A"}, {CODE_L6A, "6A"}
 };
 
 static void prssr(vt_t *vt)
@@ -1104,7 +1128,7 @@ static void cmd_satellite(char **args, int narg, vt_t *vt)
 /* observ command ------------------------------------------------------------*/
 static void cmd_observ(char **args, int narg, vt_t *vt)
 {
-    int i,nf=4,cycle=0;
+    int i,nf=2,cycle=0;
     
     trace(3,"cmd_observ:\n");
     
