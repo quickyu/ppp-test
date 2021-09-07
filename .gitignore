@@ -3,5 +3,7 @@
 rtkrcv/gcc/rtkrcv
 *.nav
 *.trace
+sbf_tools/
+test/
 
 
