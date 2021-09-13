@@ -100,6 +100,7 @@
 #define ID_QZSSRAWSUBFRAME 1330 /* oem7/6 qzss raw subframe */
 #define ID_QZSSIONUTC   1347    /* oem7/6 qzss ion/utc parameters */
 #define ID_BDSEPHEMERIS 1696    /* oem7/6 decoded bds ephemeris */
+#define ID_BDSBCNAV1EPHEMERIS 2371 /* oem7/6 decoded bds cnav1 ephemeris */  
 #define ID_NAVICEPHEMERIS 2123  /* oem7 decoded navic ephemeris */
 
 #define ID_ALMB         18      /* oem3 decoded almanac */
@@ -349,10 +350,14 @@ static int checkpri(const char *opt, int sys, int code, int idx)
         if (code==CODE_L1Z) return (nex<2)?-1:NFREQ+1;
     }
     else if (sys==SYS_CMP) {
-        if (strstr(opt,"-CL1P")&&idx==0) return (code==CODE_L1P)?0:-1;
-        if (strstr(opt,"-CL7D")&&idx==0) return (code==CODE_L7D)?0:-1;
-        if (code==CODE_L1P) return (nex<1)?-1:NFREQ;
-        if (code==CODE_L7D) return (nex<2)?-1:NFREQ+1;
+#ifdef USEBD3
+    return idx;
+#else            
+    if (strstr(opt,"-CL1P")&&idx==0) return (code==CODE_L1P)?0:-1;
+    if (strstr(opt,"-CL7D")&&idx==0) return (code==CODE_L7D)?0:-1;
+    if (code==CODE_L1P) return (nex<1)?-1:NFREQ;
+    if (code==CODE_L7D) return (nex<2)?-1:NFREQ+1;
+#endif
     }
     return idx<NFREQ?idx:-1;
 }
@@ -981,6 +986,108 @@ static int decode_bdsephemerisb(raw_t *raw)
     raw->ephset=0;
     return 2;
 }
+
+static int decode_bdscnav1ephemerisb(raw_t *raw)
+{
+    eph_t eph = {0};
+    uint8_t *p = raw->buff + OEM4HLEN;
+
+    if (raw->len < OEM4HLEN + 220) {
+        trace(2,"decode_bdscnav1ephemerisb(): length error: len=%d\n", raw->len);
+        return -1;
+    }
+
+    int prn = U4(p);   
+    p += 4;
+    eph.week = U4(p);   
+    p += 4;
+    eph.svh = U4(p)&1; 
+    p += 4;
+    eph.iode = U4(p);
+    p += 4;
+    eph.toes = U4(p);
+    p += 4;
+    eph.flag = U4(p);
+    p += 4;
+    eph.A = R8(p);
+    p += 8;
+    eph.Adot = R8(p);
+    p += 8;
+    eph.deln = R8(p);
+    p += 8;
+    eph.ndot = R8(p);
+    p += 8;
+    eph.M0 = R8(p);
+    p += 8;
+    eph.e = R8(p);
+    p += 8;
+    eph.omg = R8(p);
+    p += 8;
+    eph.OMG0 = R8(p);
+    p += 8;
+    eph.i0 = R8(p);
+    p += 8;
+    eph.OMGd = R8(p);
+    p += 8;
+    eph.idot = R8(p);
+    p += 8;
+    eph.cis = R8(p);
+    p += 8;
+    eph.cic = R8(p);
+    p += 8;
+    eph.crs = R8(p);
+    p += 8;
+    eph.crc = R8(p);
+    p += 8;
+    eph.cus = R8(p);
+    p += 8;
+    eph.cuc = R8(p);
+    p += 8;
+    eph.iodc = U4(p);
+    p += 4;
+    uint32_t toc = U4(p);
+    p += 4;
+    eph.f0 = R8(p);
+    p += 8;
+    eph.f1 = R8(p);
+    p += 8;
+    eph.f2 = R8(p);
+    p += 8;
+    /* CMP:tgd[0]=TGD_B1I ,tgd[1]=TGD_B2I/B2b,tgd[2]=TGD_B1Cp */
+    /*     tgd[3]=TGD_B2ap,tgd[4]=ISC_B1Cd   ,tgd[5]=ISC_B2ad */
+    eph.tgd[2] = R8(p);
+    p += 8;
+    eph.tgd[3] = R8(p);
+
+    int sat = satno(SYS_CMP, prn);
+    if (!sat) {
+        trace(2, "decode_bdscnav1ephemerisb(): satellite error: prn=%d\n", prn);
+        return -1;
+    }
+
+    if (raw->outtype) {
+        sprintf(raw->msgtype+strlen(raw->msgtype), " prn=%d", prn);
+    }
+
+    eph.sat = sat;
+    eph.code = 7; //bds b1c;
+    eph.sva = 0;
+    eph.toe = bdt2gpst(bdt2time(eph.week, eph.toes)); /* bdt -> gpst */
+    eph.toc = bdt2gpst(bdt2time(eph.week, toc));      /* bdt -> gpst */
+    eph.ttr = raw->time;
+    
+    if (!strstr(raw->opt, "-EPHALL")) {
+        if (timediff(raw->nav.eph[sat-1].toe, eph.toe) == 0.0 &&
+            timediff(raw->nav.eph[sat-1].toc, eph.toc) == 0.0) 
+            return 0;
+    }
+
+    raw->nav.eph[sat-1] = eph;
+    raw->ephsat = sat;
+    raw->ephset = 0;
+    return 2;
+}
+
 /* decode NAVICEPHEMERISB ----------------------------------------------------*/
 static int decode_navicephemerisb(raw_t *raw)
 {
@@ -1309,7 +1416,12 @@ static int decode_oem4(raw_t *raw)
         case ID_QZSSRAWEPHEM   : return decode_qzssrawephemb   (raw);
         case ID_QZSSRAWSUBFRAME: return decode_qzssrawsubframeb(raw);
         case ID_QZSSIONUTC     : return decode_qzssionutcb     (raw);
+#ifndef USEBD3        
         case ID_BDSEPHEMERIS   : return decode_bdsephemerisb   (raw);
+#else
+        case ID_BDSBCNAV1EPHEMERIS:
+            return decode_bdscnav1ephemerisb(raw);
+#endif                
         case ID_NAVICEPHEMERIS : return decode_navicephemerisb (raw);
     }
     return 0;
