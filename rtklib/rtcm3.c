@@ -1560,8 +1560,19 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
     }
     for (j=0;j<nsat&&i+121+np+ni+nj<=rtcm->len*8;j++) {
         prn     =getbitu(rtcm->buff,i,np)+offp; i+=np;
-        iode    =getbitu(rtcm->buff,i,ni);      i+=ni;
-        iodcrc  =getbitu(rtcm->buff,i,nj);      i+=nj;
+
+        if (sys == SYS_CMP) {
+            iodcrc = getbitu(rtcm->buff,i,ni);      
+            i += ni;
+            iode =getbitu(rtcm->buff,i,nj);      
+            i += nj;
+        } else {
+            iode = getbitu(rtcm->buff,i,ni);      
+            i += ni;
+            iodcrc = getbitu(rtcm->buff,i,nj);      
+            i += nj;
+        }   
+
         deph [0]=getbits(rtcm->buff,i,22)*1E-4; i+=22;
         deph [1]=getbits(rtcm->buff,i,20)*4E-4; i+=20;
         deph [2]=getbits(rtcm->buff,i,20)*4E-4; i+=20;
@@ -1576,8 +1587,8 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
         rtcm->ssr[sat-1].t0 [0]=rtcm->time;
         rtcm->ssr[sat-1].udi[0]=udint;
         rtcm->ssr[sat-1].iod[0]=iod;
-        rtcm->ssr[sat-1].iode=iode;     /* BDS: toe */
-        rtcm->ssr[sat-1].iodcrc=iodcrc; /* BDS: iod */
+        rtcm->ssr[sat-1].iode=iode;     
+        rtcm->ssr[sat-1].iodcrc=iodcrc; 
         rtcm->ssr[sat-1].refd=refd;
         
         for (k=0;k<3;k++) {
