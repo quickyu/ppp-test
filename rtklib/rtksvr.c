@@ -185,8 +185,10 @@ static void update_eph(rtksvr_t *svr, nav_t *nav, int ephsat, int ephset,
                     time2str(eph2->toe, toe, 0);
                     time2str(eph2->toc, toc, 0);
                     time2str(eph2->ttr, ttr, 0);
-                    trace(1, "BDS ephemeris updated, %s  %s  toe: %s  toc: %s\n", id, ttr, toe, toc);
-                }
+
+                    trace(3, "update_eph : BDS ephemeris updated, %s iode: %d  ttr: %s  toe: %s  toc: %s  toes: %f\n", 
+                        id, eph2->iode, ttr, toe, toc, eph2->toes);
+                }     
             }
         }
         svr->nmsg[index][1]++;
@@ -311,19 +313,16 @@ static void update_ssr(rtksvr_t *svr, int index)
         }
 
         if (sys == SYS_CMP) {
-            int cur_toe = svr->nav.ssr[i].iode;
-            int cur_iod = svr->nav.ssr[i].iodcrc;
-            int new_toe = svr->rtcm[index].ssr[i].iode;
-            int new_iod = svr->rtcm[index].ssr[i].iodcrc;
+            int cur_iode = svr->nav.ssr[i].iode;
+            int new_iode = svr->rtcm[index].ssr[i].iode;
 
-            if (cur_toe != new_toe || cur_iod != new_iod) {
+            if (cur_iode != new_iode) {
                 char id[10], t0[64];
                 satno2id(i+1, id);
                 time2str(svr->rtcm[index].ssr[i].t0[0], t0, 0);
-
-                trace(1, "BDS ssr updated, %s  %s  ctoe %d  ciod %d  ntoe %d  niod %d\n",
-                    id, t0, cur_toe, cur_iod, new_toe, new_iod);
-            }
+                trace(3, "update_ssr : BDS ssr updated, %s  t0: %s  new_iode: %d  old_iode: %d\n",
+                    id, t0, new_iode, cur_iode);
+            } 
         }
 
         svr->nav.ssr[i]=svr->rtcm[index].ssr[i];
@@ -601,6 +600,7 @@ static void *rtksvrthread(void *arg)
     uint8_t *p,*q;
     char msg[128];
     int i,j,n,fobs[3]={0},cycle,cputime;
+    static int wait_ssr = 1;
     
     tracet(3,"rtksvrthread:\n");
     
@@ -651,6 +651,26 @@ static void *rtksvrthread(void *arg)
             }
             for (i=0;i<3;i++) svr->rtk.opt.rb[i]=svr->rb_ave[i];
         }
+
+        if (svr->rtk.opt.mode == PMODE_PPP_KINEMA && wait_ssr) {
+            int count = 0;
+
+            for (int prn = 19; prn < 47; prn++) {
+                int sat = satno(SYS_CMP, prn);
+                if (svr->nav.ssr[sat-1].t0[0].time != 0 && 
+                        svr->nav.ssr[sat-1].t0[1].time != 0)
+                    count++;    
+            }
+
+            if (count > 6) {
+                trace(3, "rtksvrthread : number of ssr %d\n", count);
+                wait_ssr = 0;
+            } else {
+                trace(3, "rtksvrthread : not enough ssr, %d\n", count);
+                continue;
+            }    
+        } 
+
         for (i=0;i<fobs[0];i++) { /* for each rover observation data */
             obs.n=0;
             for (j=0;j<svr->obs[0][i].n&&obs.n<MAXOBS*2;j++) {
@@ -682,6 +702,7 @@ static void *rtksvrthread(void *arg)
                 svr->prcout+=fobs[0]-i-1;
             }
         }
+
         /* send null solution if no solution (1hz) */
         if (svr->rtk.sol.stat==SOLQ_NONE&&(int)(tick-tick1hz)>=1000) {
             writesol(svr,0);
