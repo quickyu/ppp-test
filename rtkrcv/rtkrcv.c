@@ -178,7 +178,7 @@ static const char *pathopts[]={         /* path options help */
 #define TIMOPT  "0:gpst,1:utc,2:jst,3:tow"
 #define CONOPT  "0:dms,1:deg,2:xyz,3:enu,4:pyl"
 #define FLGOPT  "0:off,1:std+2:age/ratio/ns"
-#define ISTOPT  "0:off,1:serial,2:file,3:tcpsvr,4:tcpcli,6:ntripcli,7:ftp,8:http"
+#define ISTOPT  "0:off,1:serial,2:file,3:tcpsvr,4:tcpcli,6:ntripcli,7:ftp,8:http,9:ntripcas,10:udpsvr"
 #define OSTOPT  "0:off,1:serial,2:file,3:tcpsvr,4:tcpcli,6:ntripsvr,11:ntripc_c"
 #define FMTOPT  "0:rtcm2,1:rtcm3,2:oem4,3:oem3,4:ubx,5:ss2,6:hemis,7:skytraq,8:gw10,9:javad,10:nvs,11:binex,12:rt17,13:sbf,14:cmr,15:tersus,18:sp3"
 #define NMEOPT  "0:off,1:latlon,2:single"
@@ -1706,9 +1706,9 @@ int main(int argc, char **argv)
     getsysopts(&prcopt,solopt,&filopt);
     
     /* read navigation data */
-    if (!readnav(NAVIFILE,&svr.nav)) {
-        fprintf(stderr,"no navigation data: %s\n",NAVIFILE);
-    }
+    //if (!readnav(NAVIFILE,&svr.nav)) {
+    //    fprintf(stderr,"no navigation data: %s\n",NAVIFILE);
+    //}
     if (outstat>0) {
         rtkopenstat(STATFILE,outstat);
     }
@@ -1762,9 +1762,9 @@ int main(int argc, char **argv)
     if (outstat>0) rtkclosestat();
     
     /* save navigation data */
-    if (!savenav(NAVIFILE,&svr.nav)) {
-        fprintf(stderr,"navigation data save error: %s\n",NAVIFILE);
-    }
+    //if (!savenav(NAVIFILE,&svr.nav)) {
+    //    fprintf(stderr,"navigation data save error: %s\n",NAVIFILE);
+    //}
     traceclose();
     return 0;
 }
