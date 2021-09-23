@@ -1444,6 +1444,8 @@ static int decode_ssr_epoch(rtcm_t *rtcm, int sys, int subtype)
         }
         else {
             tow=getbitu(rtcm->buff,i,20); i+=20;
+            if (sys == SYS_CMP)
+                tow += 14;
             adjweek(rtcm,tow);
         }
     }
