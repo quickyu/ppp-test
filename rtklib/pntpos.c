@@ -121,11 +121,19 @@ static double prange(const obsd_t *obs, const nav_t *nav, const prcopt_t *opt,
             return (P2-gamma*P1)/(1.0-gamma);
         }
         else if (sys==SYS_CMP) { /* B1-B2 */
-            gamma=SQR(((obs->code[0]==CODE_L2I)?FREQ1_CMP:FREQ1)/FREQ2_CMP);
-            if      (obs->code[0]==CODE_L2I) b1=gettgd(sat,nav,0); /* TGD_B1I */
-            else if (obs->code[0]==CODE_L1P) b1=gettgd(sat,nav,2); /* TGD_B1Cp */
-            else b1=gettgd(sat,nav,2)+gettgd(sat,nav,4); /* TGD_B1Cp+ISC_B1Cd */
-            b2=gettgd(sat,nav,1); /* TGD_B2I/B2bI (m) */
+            if (obs->code[0] == CODE_L1P && obs->code[1] == CODE_L5P) 
+                gamma = SQR(FREQ1/FREQ5);
+            else
+                gamma = SQR(((obs->code[0] == CODE_L2I) ? FREQ1_CMP : FREQ1) / FREQ2_CMP);
+
+            if (obs->code[0] == CODE_L1P) {
+                b1 = gettgd(sat, nav, 2); /* TGD_B1Cp */
+                b2 = gettgd(sat, nav, 3); //TGD_B2ap
+            } else  {
+                b1 = gettgd(sat, nav, 0); /* TGD_B1I */
+                b2 = gettgd(sat, nav, 1); /* TGD_B2I/B2bI (m) */ 
+            }    
+
             return ((P2-gamma*P1)-(b2-gamma*b1))/(1.0-gamma);
         }
         else if (sys==SYS_IRN) { /* L5-S */
@@ -151,9 +159,12 @@ static double prange(const obsd_t *obs, const nav_t *nav, const prcopt_t *opt,
             return P1-b1;
         }
         else if (sys==SYS_CMP) { /* B1I/B1Cp/B1Cd */
-            if      (obs->code[0]==CODE_L2I) b1=gettgd(sat,nav,0); /* TGD_B1I */
-            else if (obs->code[0]==CODE_L1P) b1=gettgd(sat,nav,2); /* TGD_B1Cp */
-            else b1=gettgd(sat,nav,2)+gettgd(sat,nav,4); /* TGD_B1Cp+ISC_B1Cd */
+            if (obs->code[0] == CODE_L2I) 
+                b1=gettgd(sat,nav,0); /* TGD_B1I */
+            else if (obs->code[0] == CODE_L1P) 
+                b1 = gettgd(sat,nav,2); /* TGD_B1Cp */
+            else 
+                b1 = gettgd(sat,nav,2)+gettgd(sat,nav,4); /* TGD_B1Cp+ISC_B1Cd */
             return P1-b1;
         }
         else if (sys==SYS_IRN) { /* L5 */
@@ -627,8 +638,10 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     rs=mat(6,n); dts=mat(2,n); var=mat(1,n); azel_=zeros(2,n); resp=mat(1,n);
     
     if (opt_.mode!=PMODE_SINGLE) { /* for precise positioning */
-        opt_.ionoopt=IONOOPT_BRDC;
-        opt_.tropopt=TROPOPT_SAAS;
+        //opt_.ionoopt=IONOOPT_BRDC;
+        opt_.ionoopt=IONOOPT_IFLC;
+        //opt_.tropopt=TROPOPT_SAAS;
+        opt_.tropopt=TROPOPT_EST;
     }
     /* satellite positons, velocities and clocks */
     satposs(sol->time,obs,n,nav,opt_.sateph,rs,dts,var,svh);
