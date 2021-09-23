@@ -223,19 +223,45 @@ extern void eph2pos(gtime_t time, const eph_t *eph, double *rs, double *dts,
     int n,sys,prn;
     
     trace(4,"eph2pos : time=%s sat=%2d\n",time_str(time,3),eph->sat);
-    
-    if (eph->A<=0.0) {
+
+    switch ((sys = satsys(eph->sat, &prn))) {
+    case SYS_GAL: 
+        mu = MU_GAL; 
+        omge = OMGE_GAL; 
+        break;
+    case SYS_CMP: 
+        mu = MU_CMP; 
+        omge = OMGE_CMP; 
+        break;
+    default:      
+        mu = MU_GPS; 
+        omge = OMGE;     
+        break;
+    }
+
+    uint8_t use_cnav1_eph = sys == SYS_CMP && eph->code == 7;
+    trace(4, "eph2pos : use_cnav1_eph=%d, flag=%d\n", use_cnav1_eph, eph->flag);
+
+    if (!use_cnav1_eph && eph->A<=0.0) {
         rs[0]=rs[1]=rs[2]=*dts=*var=0.0;
         return;
     }
+
     tk=timediff(time,eph->toe);
-    
-    switch ((sys=satsys(eph->sat,&prn))) {
-        case SYS_GAL: mu=MU_GAL; omge=OMGE_GAL; break;
-        case SYS_CMP: mu=MU_CMP; omge=OMGE_CMP; break;
-        default:      mu=MU_GPS; omge=OMGE;     break;
+       
+    double A, Ak;
+
+    if (use_cnav1_eph) {
+        A = eph->A + (eph->flag == 3 ? 27906100.0 : 42162200.0); 
+        Ak = A + eph->Adot*tk;
     }
-    M=eph->M0+(sqrt(mu/(eph->A*eph->A*eph->A))+eph->deln)*tk;
+
+    if (use_cnav1_eph) {
+        double na = sqrt(mu/(A*A*A)) + eph->deln + eph->ndot*tk/2;
+        M = eph->M0 + na*tk;
+    } else {
+        M=eph->M0+(sqrt(mu/(eph->A*eph->A*eph->A))+eph->deln)*tk;
+    }
     
     for (n=0,E=M,Ek=0.0;fabs(E-Ek)>RTOL_KEPLER&&n<MAX_ITER_KEPLER;n++) {
         Ek=E; E-=(E-eph->e*sin(E)-M)/(1.0-eph->e*cos(E));
@@ -249,7 +275,12 @@ extern void eph2pos(gtime_t time, const eph_t *eph, double *rs, double *dts,
     trace(4,"kepler: sat=%2d e=%8.5f n=%2d del=%10.3e\n",eph->sat,eph->e,n,E-Ek);
     
     u=atan2(sqrt(1.0-eph->e*eph->e)*sinE,cosE-eph->e)+eph->omg;
-    r=eph->A*(1.0-eph->e*cosE);
+
+    if (use_cnav1_eph)
+        r = Ak*(1.0 - eph->e*cosE);
+    else
+        r=eph->A*(1.0-eph->e*cosE);
+
     i=eph->i0+eph->idot*tk;
     sin2u=sin(2.0*u); cos2u=cos(2.0*u);
     u+=eph->cus*sin2u+eph->cuc*cos2u;
@@ -280,7 +311,10 @@ extern void eph2pos(gtime_t time, const eph_t *eph, double *rs, double *dts,
     *dts=eph->f0+eph->f1*tk+eph->f2*tk*tk;
     
     /* relativity correction */
-    *dts-=2.0*sqrt(mu*eph->A)*eph->e*sinE/SQR(CLIGHT);
+    if (use_cnav1_eph)
+        *dts -= 2.0*sqrt(mu*Ak)*eph->e*sinE/SQR(CLIGHT);
+    else    
+        *dts-=2.0*sqrt(mu*eph->A)*eph->e*sinE/SQR(CLIGHT);
     
     /* position and clock error variance */
     *var=var_uraeph(sys,eph->sva);
@@ -421,41 +455,87 @@ extern void seph2pos(gtime_t time, const seph_t *seph, double *rs, double *dts,
 /* select ephememeris --------------------------------------------------------*/
 static eph_t *seleph(gtime_t time, int sat, int iode, const nav_t *nav)
 {
-    double t,tmax,tmin;
-    int i,j=-1,sys,sel;
+    double t, tmax, tmin;
+    int i, j = -1, sys, sel;
     
-    trace(4,"seleph  : time=%s sat=%2d iode=%d\n",time_str(time,3),sat,iode);
+    trace(4, "seleph  : time=%s sat=%2d iode=%d\n", time_str(time, 3), sat, iode);
     
-    sys=satsys(sat,NULL);
+    sys = satsys(sat, NULL);
     switch (sys) {
-        case SYS_GPS: tmax=MAXDTOE+1.0    ; sel=eph_sel[0]; break;
-        case SYS_GAL: tmax=MAXDTOE_GAL    ; sel=eph_sel[2]; break;
-        case SYS_QZS: tmax=MAXDTOE_QZS+1.0; sel=eph_sel[3]; break;
-        case SYS_CMP: tmax=MAXDTOE_CMP+1.0; sel=eph_sel[4]; break;
-        case SYS_IRN: tmax=MAXDTOE_IRN+1.0; sel=eph_sel[5]; break;
-        default: tmax=MAXDTOE+1.0; break;
+    case SYS_GPS: 
+        tmax = MAXDTOE + 1.0; 
+        sel = eph_sel[0]; 
+        break;
+    case SYS_GAL: 
+        tmax = MAXDTOE_GAL; 
+        sel = eph_sel[2]; 
+        break;
+    case SYS_QZS: 
+        tmax = MAXDTOE_QZS + 1.0; 
+        sel = eph_sel[3]; 
+        break;
+    case SYS_CMP: 
+        tmax = MAXDTOE_CMP + 1.0; 
+        sel = eph_sel[4]; 
+        break;
+    case SYS_IRN: 
+        tmax = MAXDTOE_IRN + 1.0; 
+        sel = eph_sel[5]; 
+        break;
+    default: 
+        tmax = MAXDTOE + 1.0; 
+        break;
     }
-    tmin=tmax+1.0;
-    
-    for (i=0;i<nav->n;i++) {
-        if (nav->eph[i].sat!=sat) continue;
-        if (iode>=0&&nav->eph[i].iode!=iode) continue;
-        if (sys==SYS_GAL) {
-            sel=getseleph(SYS_GAL);
-            if (sel==0&&!(nav->eph[i].code&(1<<9))) continue; /* I/NAV */
-            if (sel==1&&!(nav->eph[i].code&(1<<8))) continue; /* F/NAV */
-            if (timediff(nav->eph[i].toe,time)>=0.0) continue; /* AOD<=0 */
+
+    tmin = tmax + 1.0;
+
+    for (i = 0; i < nav->n; i++) {
+        if (nav->eph[i].sat != sat) 
+            continue;
+
+        if (iode >= 0 && nav->eph[i].iode != iode) {
+            if (sys == SYS_CMP) {
+                trace(3, "seleph  : BDS current ephemeris iode mismatch\n");
+
+                eph_t *prev_eph = nav->eph + MAXSAT*2;
+                if (prev_eph[i].sat == sat && prev_eph[i].iode == iode) {
+                    trace(3, "seleph  : BDS prev ephemeris iode match\n");
+                    return prev_eph + i;      
+                }    
+            }
+
+            continue;
+        }    
+
+        if (sys == SYS_GAL) {
+            sel = getseleph(SYS_GAL);
+            if (sel == 0 && !(nav->eph[i].code&(1<<9))) 
+                continue; /* I/NAV */
+            if (sel == 1 && !(nav->eph[i].code&(1<<8))) 
+                continue; /* F/NAV */
+            if (timediff(nav->eph[i].toe, time) >= 0.0) 
+                continue; /* AOD<=0 */
         }
-        if ((t=fabs(timediff(nav->eph[i].toe,time)))>tmax) continue;
-        if (iode>=0) return nav->eph+i;
-        if (t<=tmin) {j=i; tmin=t;} /* toe closest to time */
+
+        if ((t = fabs(timediff(nav->eph[i].toe, time))) > tmax) 
+            continue;
+
+        if (iode >= 0) 
+            return nav->eph + i;
+
+        if (t <= tmin) {
+            j = i; 
+                tmin = t;
+        } /* toe closest to time */
     }
-    if (iode>=0||j<0) {
-        trace(3,"no broadcast ephemeris: %s sat=%2d iode=%3d\n",
-              time_str(time,0),sat,iode);
+
+    if (iode >= 0 || j < 0) {
+        trace(3, "no broadcast ephemeris: %s sat=%2d iode=%3d\n",
+            time_str(time, 0), sat, iode);
         return NULL;
     }
-    return nav->eph+j;
+
+    return nav->eph + j;
 }
 /* select glonass ephememeris ------------------------------------------------*/
 static geph_t *selgeph(gtime_t time, int sat, int iode, const nav_t *nav)
@@ -606,95 +686,120 @@ static int satpos_ssr(gtime_t time, gtime_t teph, int sat, const nav_t *nav,
 {
     const ssr_t *ssr;
     eph_t *eph;
-    double t1,t2,t3,er[3],ea[3],ec[3],rc[3],deph[3],dclk,dant[3]={0},tk;
-    int i,sys;
+    double t1, t2, t3, er[3], ea[3], ec[3], rc[3], deph[3], dclk, dant[3] = {0}, tk;
+    int i, sys;
     
-    trace(4,"satpos_ssr: time=%s sat=%2d\n",time_str(time,3),sat);
+    trace(4,"satpos_ssr: time=%s sat=%2d\n", time_str(time, 3), sat);
     
-    ssr=nav->ssr+sat-1;
+    ssr = nav->ssr + sat - 1;
     
     if (!ssr->t0[0].time) {
-        trace(2,"no ssr orbit correction: %s sat=%2d\n",time_str(time,0),sat);
+        trace(2,"satpos_ssr : no ssr orbit correction: %s sat=%2d\n",time_str(time,0),sat);
         return 0;
     }
+
     if (!ssr->t0[1].time) {
-        trace(2,"no ssr clock correction: %s sat=%2d\n",time_str(time,0),sat);
+        trace(2,"satpos_ssr : no ssr clock correction: %s sat=%2d\n",time_str(time,0),sat);
         return 0;
     }
+
     /* inconsistency between orbit and clock correction */
-    if (ssr->iod[0]!=ssr->iod[1]) {
+    if (ssr->iod[0] != ssr->iod[1]) {
         trace(2,"inconsist ssr correction: %s sat=%2d iod=%d %d\n",
-              time_str(time,0),sat,ssr->iod[0],ssr->iod[1]);
-        *svh=-1;
+              time_str(time, 0), sat, ssr->iod[0], ssr->iod[1]);
+        *svh = -1;
         return 0;
     }
-    t1=timediff(time,ssr->t0[0]);
-    t2=timediff(time,ssr->t0[1]);
-    t3=timediff(time,ssr->t0[2]);
+
+    //t1 = timediff(time, ssr->t0[0]);
+    //t2 = timediff(time, ssr->t0[1]);
+    //t3 = timediff(time, ssr->t0[2]);
     
     /* ssr orbit and clock correction (ref [4]) */
-    if (fabs(t1)>MAXAGESSR||fabs(t2)>MAXAGESSR) {
-        trace(2,"age of ssr error: %s sat=%2d t=%.0f %.0f\n",time_str(time,0),
-              sat,t1,t2);
-        *svh=-1;
-        return 0;
-    }
-    if (ssr->udi[0]>=1.0) t1-=ssr->udi[0]/2.0;
-    if (ssr->udi[1]>=1.0) t2-=ssr->udi[1]/2.0;
+    //if (fabs(t1) > MAXAGESSR || fabs(t2) > MAXAGESSR) {
+    //    trace(2,"satpos_ssr : age of ssr error: %s sat=%2d t=%.0f %.0f\n", time_str(time, 0),
+    //          sat,t1,t2);
+    //    *svh = -1;
+    //    return 0;
+    //}
+
+    //if (ssr->udi[0] >= 1.0) 
+    //    t1 -= ssr->udi[0]/2.0;
+    //if (ssr->udi[1] >= 1.0) 
+    //    t2 -= ssr->udi[1]/2.0;
     
-    for (i=0;i<3;i++) deph[i]=ssr->deph[i]+ssr->ddeph[i]*t1;
-    dclk=ssr->dclk[0]+ssr->dclk[1]*t2+ssr->dclk[2]*t2*t2;
+    for (i = 0; i < 3; i++) {
+        //deph[i] = ssr->deph[i] + ssr->ddeph[i]*t1;
+        deph[i] = ssr->deph[i];
+    }    
+
+    //dclk = ssr->dclk[0] + ssr->dclk[1]*t2 + ssr->dclk[2]*t2*t2;
+    dclk = ssr->dclk[0];
     
     /* ssr highrate clock correction (ref [4]) */
-    if (ssr->iod[0]==ssr->iod[2]&&ssr->t0[2].time&&fabs(t3)<MAXAGESSR_HRCLK) {
-        dclk+=ssr->hrclk;
-    }
-    if (norm(deph,3)>MAXECORSSR||fabs(dclk)>MAXCCORSSR) {
-        trace(3,"invalid ssr correction: %s deph=%.1f dclk=%.1f\n",
-              time_str(time,0),norm(deph,3),dclk);
-        *svh=-1;
+    //if (ssr->iod[0] == ssr->iod[2] && ssr->t0[2].time && fabs(t3) < MAXAGESSR_HRCLK) {
+    //    dclk += ssr->hrclk;
+   // }
+
+    if (norm(deph, 3) > MAXECORSSR || fabs(dclk) > MAXCCORSSR) {
+        trace(3, "satpos_ssr : invalid ssr correction: %s deph=%.1f dclk=%.1f\n",
+              time_str(time, 0), norm(deph, 3), dclk);
+        *svh = -1;
         return 0;
     }
+
     /* satellite postion and clock by broadcast ephemeris */
-    if (!ephpos(time,teph,sat,nav,ssr->iode,rs,dts,var,svh)) return 0;
+    if (!ephpos(time, teph, sat, nav, ssr->iode, rs, dts, var, svh)) 
+        return 0;
     
     /* satellite clock for gps, galileo and qzss */
-    sys=satsys(sat,NULL);
-    if (sys==SYS_GPS||sys==SYS_GAL||sys==SYS_QZS||sys==SYS_CMP) {
-        if (!(eph=seleph(teph,sat,ssr->iode,nav))) return 0;
+    //sys = satsys(sat, NULL);
+    //if (sys == SYS_GPS || sys == SYS_GAL || sys == SYS_QZS || sys == SYS_CMP) {
+    //    if (!(eph = seleph(teph, sat, ssr->iode, nav))) 
+    //        return 0;
         
         /* satellite clock by clock parameters */
-        tk=timediff(time,eph->toc);
-        dts[0]=eph->f0+eph->f1*tk+eph->f2*tk*tk;
-        dts[1]=eph->f1+2.0*eph->f2*tk;
+    //    tk = timediff(time, eph->toc);
+    //    dts[0] = eph->f0 + eph->f1*tk + eph->f2*tk*tk;
+    //    dts[1] = eph->f1 + 2.0*eph->f2*tk;
         
         /* relativity correction */
-        dts[0]-=2.0*dot(rs,rs+3,3)/CLIGHT/CLIGHT;
-    }
+    //    dts[0] -= 2.0*dot(rs, rs+3, 3)/CLIGHT/CLIGHT;
+    //}
+
     /* radial-along-cross directions in ecef */
-    if (!normv3(rs+3,ea)) return 0;
-    cross3(rs,rs+3,rc);
-    if (!normv3(rc,ec)) {
-        *svh=-1;
+    //if (!normv3(rs+3, ea)) 
+    //    return 0;
+    if (!normv3(rs, er)) 
+        return 0;
+
+    cross3(rs, rs+3, rc);
+    if (!normv3(rc, ec)) {
+        *svh = -1;
         return 0;
     }
-    cross3(ea,ec,er);
-    
+
+    //cross3(ea, ec, er);
+    cross3(er, ec, ea);
+        
     /* satellite antenna offset correction */
     if (opt) {
-        satantoff(time,rs,sat,nav,dant);
+        satantoff(time, rs, sat, nav, dant);
     }
-    for (i=0;i<3;i++) {
-        rs[i]+=-(er[i]*deph[0]+ea[i]*deph[1]+ec[i]*deph[2])+dant[i];
+
+    for (i = 0; i < 3; i++) {
+        rs[i] += -(er[i]*deph[0] + ea[i]*deph[1] + ec[i]*deph[2]) + dant[i];
     }
+
     /* t_corr = t_sv - (dts(brdc) + dclk(ssr) / CLIGHT) (ref [10] eq.3.12-7) */
-    dts[0]+=dclk/CLIGHT;
+    //dts[0] += dclk/CLIGHT;
+    dts[0] -= dclk/CLIGHT;
     
     /* variance by ssr ura */
-    *var=var_urassr(ssr->ura);
+    *var = var_urassr(ssr->ura);
     
-    trace(5,"satpos_ssr: %s sat=%2d deph=%6.3f %6.3f %6.3f er=%6.3f %6.3f %6.3f dclk=%6.3f var=%6.3f\n",
-          time_str(time,2),sat,deph[0],deph[1],deph[2],er[0],er[1],er[2],dclk,*var);
+    trace(5, "satpos_ssr: %s sat=%2d deph=%6.3f %6.3f %6.3f er=%6.3f %6.3f %6.3f dclk=%6.3f var=%6.3f\n",
+          time_str(time, 2), sat, deph[0], deph[1], deph[2], er[0], er[1], er[2], dclk, *var);
     
     return 1;
 }
