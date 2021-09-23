@@ -43,6 +43,10 @@
 *                            use API sat2freq() to get carrier frequency
 *                            use integer types in stdint.h
 *-----------------------------------------------------------------------------*/
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "rtklib.h"
 
 #define MIN_INT_RESET   30000   /* mininum interval of reset command (ms) */
@@ -584,6 +588,44 @@ static void send_nmea(rtksvr_t *svr, uint32_t *tickreset)
 			   sol_nmea.rr[2]);
 	}
 }
+
+static void read_rtcm_ssr(FILE *fp, gtime_t time, rtksvr_t *svr)
+{
+    static int first_run = 1;
+
+    if (fp == NULL)
+        return;
+
+    rtcm_t *rtcm = &svr->rtcm[2];
+
+    if (first_run) {
+        first_run = 0;
+        rtcm->time = time;
+        input_rtcm3f(rtcm, fp);
+    }
+
+    gtime_t ssr_time = rtcm->time;
+
+    while (timediff(ssr_time, time) <= 0) {
+        for (int i = 0; i < MAXSAT; i++) {
+            if (!rtcm->ssr[i].update) 
+                continue;
+            svr->nav.ssr[i] = rtcm->ssr[i];    
+            rtcm->ssr[i].update = 0;
+        }
+
+        if (input_rtcm3f(rtcm, fp) < -1) 
+            break;
+            
+        ssr_time = rtcm->time;
+    }
+
+    char ssr_tstr[64], obs_tstr[64];
+    time2str(rtcm->time, ssr_tstr, 0);
+    time2str(time, obs_tstr, 0);
+    trace(3, "read_rtcm_ssr : ssr time %s   obs time %s\n", ssr_tstr, obs_tstr);
+}
+
 /* rtk server thread ---------------------------------------------------------*/
 #ifdef WIN32
 static DWORD WINAPI rtksvrthread(void *arg)
@@ -608,10 +650,17 @@ static void *rtksvrthread(void *arg)
     svr->tick=tickget();
     ticknmea=tick1hz=svr->tick-1000;
     tickreset=svr->tick-MIN_INT_RESET;
+
+    int post_ppp = svr->stream[0].type == STR_FILE && 
+            svr->stream[2].type == STR_FILE && 
+            svr->rtk.opt.mode >= PMODE_PPP_KINEMA; 
     
     for (cycle=0;svr->state;cycle++) {
         tick=tickget();
         for (i=0;i<3;i++) {
+            if (post_ppp && i == 2)
+                continue;    
+
             p=svr->buff[i]+svr->nb[i]; q=svr->buff[i]+svr->buffsize;
             
             /* read receiver raw/rtcm data from input stream */
@@ -630,6 +679,9 @@ static void *rtksvrthread(void *arg)
             rtksvrunlock(svr);
         }
         for (i=0;i<3;i++) {
+            if (post_ppp && i == 2)
+                continue;   
+
             if (svr->format[i]==STRFMT_SP3||svr->format[i]==STRFMT_RNXCLK) {
                 /* decode download file */
                 decodefile(svr,i);
@@ -652,25 +704,6 @@ static void *rtksvrthread(void *arg)
             for (i=0;i<3;i++) svr->rtk.opt.rb[i]=svr->rb_ave[i];
         }
 
-        if (svr->rtk.opt.mode == PMODE_PPP_KINEMA && wait_ssr) {
-            int count = 0;
-
-            for (int prn = 19; prn < 47; prn++) {
-                int sat = satno(SYS_CMP, prn);
-                if (svr->nav.ssr[sat-1].t0[0].time != 0 && 
-                        svr->nav.ssr[sat-1].t0[1].time != 0)
-                    count++;    
-            }
-
-            if (count > 6) {
-                trace(3, "rtksvrthread : number of ssr %d\n", count);
-                wait_ssr = 0;
-            } else {
-                trace(3, "rtksvrthread : not enough ssr, %d\n", count);
-                continue;
-            }    
-        } 
-
         for (i=0;i<fobs[0];i++) { /* for each rover observation data */
             obs.n=0;
             for (j=0;j<svr->obs[0][i].n&&obs.n<MAXOBS*2;j++) {
@@ -683,6 +716,32 @@ static void *rtksvrthread(void *arg)
             if (!strstr(svr->rtk.opt.pppopt,"-DIS_FCB")) {
                 corr_phase_bias(obs.data,obs.n,&svr->nav);
             }
+
+            if (post_ppp) {
+                FILE *fp = *(FILE **)(svr->stream[2].port);
+                rtksvrlock(svr);
+                read_rtcm_ssr(fp, obs.data[0].time, svr);
+                rtksvrunlock(svr);
+            }
+
+            if (svr->rtk.opt.mode >= PMODE_PPP_KINEMA && wait_ssr) {
+                int count = 0;
+                for (int prn = 19; prn < 47; prn++) {
+                    int sat = satno(SYS_CMP, prn);
+                    if (svr->nav.ssr[sat-1].t0[0].time != 0 && 
+                            svr->nav.ssr[sat-1].t0[1].time != 0)
+                        count++;    
+                }
+
+                if (count > 6) {
+                    trace(3, "rtksvrthread : number of ssr %d\n", count);
+                    wait_ssr = 0;
+                } else {
+                    trace(3, "rtksvrthread : not enough ssr, %d\n", count);
+                    continue;
+                }    
+            } 
+
             /* rtk positioning */
             rtksvrlock(svr);
             rtkpos(&svr->rtk,obs.data,obs.n,&svr->nav);
