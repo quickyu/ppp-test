@@ -390,6 +390,13 @@ static void corr_meas(const obsd_t *obs, const nav_t *nav, const double *azel,
             if (obs->code[i]==CODE_L1C) P[i]+=nav->cbias[obs->sat-1][1];
             if (obs->code[i]==CODE_L2C) P[i]+=nav->cbias[obs->sat-1][2];
         }
+
+        if (sys == SYS_CMP) {
+            if (obs->code[i] == CODE_L1P) 
+                P[i] -= nav->ssr[obs->sat-1].cbias[CODE_L1P-1];
+            if (obs->code[i] == CODE_L5P) 
+                P[i] -= nav->ssr[obs->sat-1].cbias[CODE_L5P-1];    
+        }
     }
     /* iono-free LC */
     *Lc=*Pc=0.0;
