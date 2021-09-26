@@ -1589,6 +1589,9 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
         rtcm->ssr[sat-1].t0 [0]=rtcm->time;
         rtcm->ssr[sat-1].udi[0]=udint;
         rtcm->ssr[sat-1].iod[0]=iod;
+
+        int iode_changed = rtcm->ssr[sat-1].iode != iode;
+
         rtcm->ssr[sat-1].iode=iode;     
         rtcm->ssr[sat-1].iodcrc=iodcrc; 
         rtcm->ssr[sat-1].refd=refd;
@@ -1597,7 +1600,9 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
             rtcm->ssr[sat-1].deph [k]=deph [k];
             rtcm->ssr[sat-1].ddeph[k]=ddeph[k];
         }
-        rtcm->ssr[sat-1].update=1;
+
+        if (!iode_changed)
+            rtcm->ssr[sat-1].update=1;
     }
     return sync?0:10;
 }
@@ -1644,6 +1649,7 @@ static int decode_ssr2(rtcm_t *rtcm, int sys, int subtype)
         for (k=0;k<3;k++) {
             rtcm->ssr[sat-1].dclk[k]=dclk[k];
         }
+
         rtcm->ssr[sat-1].update=1;
     }
     return sync?0:10;
