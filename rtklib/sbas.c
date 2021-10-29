@@ -718,7 +718,7 @@ extern int sbsioncorr(gtime_t time, const nav_t *nav, const double *pos,
     }
     *delay*=fp; *var*=fp*fp;
     
-    trace(5,"sbsioncorr: dion=%7.2f sig=%7.2f\n",*delay,sqrt(*var));
+    trace(4,"sbsioncorr: dion=%7.2f sig=%7.2f\n",*delay,sqrt(*var));
     return 1;
 }
 /* get meterological parameters ----------------------------------------------*/
