@@ -789,6 +789,7 @@ typedef struct {        /* SSR correction type */
     float  stdpb[MAXCODE]; /* std-dev of phase biases (m) */
     double yaw_ang,yaw_rate; /* yaw angle and yaw rate (deg,deg/s) */
     uint8_t update;     /* update flag (0:no update,1:update) */
+    uint8_t iode_flag;
 } ssr_t;
 
 typedef struct {        /* navigation data type */

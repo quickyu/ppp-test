@@ -1590,7 +1590,7 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
         rtcm->ssr[sat-1].udi[0]=udint;
         rtcm->ssr[sat-1].iod[0]=iod;
 
-        int iode_changed = rtcm->ssr[sat-1].iode != iode;
+        rtcm->ssr[sat-1].iode_flag = rtcm->ssr[sat-1].iode != iode;
 
         rtcm->ssr[sat-1].iode=iode;     
         rtcm->ssr[sat-1].iodcrc=iodcrc; 
@@ -1601,7 +1601,7 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
             rtcm->ssr[sat-1].ddeph[k]=ddeph[k];
         }
 
-        if (!iode_changed)
+        if (!rtcm->ssr[sat-1].iode_flag)
             rtcm->ssr[sat-1].update=1;
     }
     return sync?0:10;
@@ -1651,6 +1651,7 @@ static int decode_ssr2(rtcm_t *rtcm, int sys, int subtype)
         }
 
         rtcm->ssr[sat-1].update=1;
+        rtcm->ssr[sat-1].iode_flag = 0;
     }
     return sync?0:10;
 }
@@ -1707,7 +1708,9 @@ static int decode_ssr3(rtcm_t *rtcm, int sys, int subtype)
         for (k=0;k<MAXCODE;k++) {
             rtcm->ssr[sat-1].cbias[k]=(float)cbias[k];
         }
-        rtcm->ssr[sat-1].update=1;
+
+        if (!rtcm->ssr[sat-1].iode_flag)
+            rtcm->ssr[sat-1].update=1;
     }
     return sync?0:10;
 }
@@ -1789,7 +1792,7 @@ static int decode_ssr5(rtcm_t *rtcm, int sys, int subtype)
         case SYS_GLO: np=5; offp=  0; break;
         case SYS_GAL: np=6; offp=  0; break;
         case SYS_QZS: np=4; offp=192; break;
-        case SYS_CMP: np=6; offp=  1; break;
+        case SYS_CMP: np=6; offp=  0; break;
         case SYS_SBS: np=6; offp=120; break;
         default: return sync?0:10;
     }
@@ -1810,7 +1813,9 @@ static int decode_ssr5(rtcm_t *rtcm, int sys, int subtype)
         rtcm->ssr[sat-1].udi[3]=udint;
         rtcm->ssr[sat-1].iod[3]=iod;
         rtcm->ssr[sat-1].ura=ura;
-        rtcm->ssr[sat-1].update=1;
+
+        if (!rtcm->ssr[sat-1].iode_flag)
+            rtcm->ssr[sat-1].update=1;
     }
     return sync?0:10;
 }
