@@ -394,7 +394,7 @@ static void corr_meas(const obsd_t *obs, const nav_t *nav, const double *azel,
         if (sys == SYS_CMP) {
             if (obs->code[i] == CODE_L1P) 
                 P[i] -= nav->ssr[obs->sat-1].cbias[CODE_L1P-1];
-            if (obs->code[i] == CODE_L5P) 
+            else if (obs->code[i] == CODE_L5P) 
                 P[i] -= nav->ssr[obs->sat-1].cbias[CODE_L5P-1];    
         }
     }
@@ -698,13 +698,20 @@ static void udbias_ppp(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
             }
             else if (L[f]!=0.0&&P[f]!=0.0) {
                 freq1=sat2freq(sat,obs[i].code[0],nav);
-                freq2=sat2freq(sat,obs[i].code[f],nav);
+                //freq2=sat2freq(sat,obs[i].code[f],nav);
+                freq2=sat2freq(sat,obs[i].code[1],nav);
+
                 slip[i]=rtk->ssat[sat-1].slip[f];
+
                 if (obs[i].P[0]==0.0||obs[i].P[1]==0.0||freq1==0.0||freq2==0.0) {
                     continue;
                 }
-                ion=(obs[i].P[0]-obs[i].P[f])/(1.0-SQR(freq1/freq2));
-                bias[i]=L[f]-P[f]+2.0*ion*SQR(freq1/freq2);
+
+                //ion=(obs[i].P[0]-obs[i].P[f])/(1.0-SQR(freq1/freq2));
+                ion=(obs[i].P[0]-obs[i].P[1])/(1.0-SQR(freq1/freq2));
+
+                //bias[i]=L[f]-P[f]+2.0*ion*SQR(freq1/freq2);
+                bias[i]=L[f]-P[f]+2.0*ion;
             }
             if (rtk->x[j]==0.0||slip[i]||bias[i]==0.0) continue;
             
@@ -927,7 +934,8 @@ static int ppp_res(int post, const obsd_t *obs, int n, const double *rs,
                 if ((y=j%2==0?L[j/2]:P[j/2])==0.0) continue;
                 
                 if ((freq=sat2freq(sat,obs[i].code[j/2],nav))==0.0) continue;
-                C=SQR(FREQ1/freq)*ionmapf(pos,azel+i*2)*(j%2==0?-1.0:1.0);
+                //C=SQR(FREQ1/freq)*ionmapf(pos,azel+i*2)*(j%2==0?-1.0:1.0);
+                C=SQR(FREQ1/freq)*(j%2==0?-1.0:1.0);
             }
             for (k=0;k<nx;k++) H[k+nx*nv]=k<3?-e[k]:0.0;
             
