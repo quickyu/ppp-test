@@ -1000,7 +1000,7 @@ static void prssr(vt_t *vt)
     gtime_t time;
     ssr_t ssr[MAXSAT];
     int i,valid;
-    char tstr[64],id[32],*p=buff;
+    char tstr[64], t1str[64], id[32], *p = buff;
     
     rtksvrlock(&svr);
     time=svr.rtk.sol.time;
@@ -1009,22 +1009,26 @@ static void prssr(vt_t *vt)
     }
     rtksvrunlock(&svr);
     
-    p+=sprintf(p,"\n%s%3s %3s %3s %3s %3s %19s %6s %6s %6s %6s %6s %6s %8s "
-               "%6s %6s %6s%s\n",
-               ESC_BOLD,"SAT","S","UDI","IOD","URA","T0","D0-A","D0-C","D0-R",
-               "D1-A","D1-C","D1-R","C0","C1","C2","C-HR",ESC_RESET);
-    for (i=0;i<MAXSAT;i++) {
-        if (!ssr[i].t0[0].time) continue;
+    p += sprintf(p,"\n%s%3s %3s %3s %3s %3s %19s %6s %6s %6s %6s %6s %6s %19s %8s "
+               "%6s %6s %6s %6s%s\n",
+               ESC_BOLD, "SAT", "S", "UDI", "IOD", "URA", "T0-0", "D0-A", "D0-C", "D0-R",
+               "D1-A", "D1-C", "D1-R", "T0-1", "C0", "C1", "C2", "C-HR", "CBIAS",ESC_RESET);
+
+    for (i = 0; i < MAXSAT; i++) {
+        if (!ssr[i].t0[0].time) 
+            continue;
+
         satno2id(i+1,id);
-        valid=fabs(timediff(time,ssr[i].t0[0]))<=1800.0;
+        valid = fabs(timediff(time, ssr[i].t0[0])) <= 1800.0;
         time2str(ssr[i].t0[0],tstr,0);
-        p+=sprintf(p,"%3s %3s %3.0f %3d %3d %19s %6.3f %6.3f %6.3f %6.3f %6.3f "
-                   "%6.3f %8.3f %6.3f %6.4f %6.3f   ",
-                   id,valid?"OK":"-",ssr[i].udi[0],ssr[i].iode,ssr[i].ura,tstr,
-                   ssr[i].deph[0],ssr[i].deph[1],ssr[i].deph[2],
-                   ssr[i].ddeph[0],ssr[i].ddeph[1],ssr[i].ddeph[2],
-                   ssr[i].dclk[0],ssr[i].dclk[1],ssr[i].dclk[2],
-                   ssr[i].hrclk);
+        time2str(ssr[i].t0[1],t1str,0);
+
+        p += sprintf(p, "%3s %3s %3.0f %3d %3d %19s %6.3f %6.3f %6.3f %6.3f %6.3f "
+                    "%6.3f %19s %8.5f %6.3f %6.4f %6.3f   ",
+                    id, valid ? "OK" : "-", ssr[i].udi[0], ssr[i].iode, ssr[i].ura, tstr,
+                    ssr[i].deph[0], ssr[i].deph[1], ssr[i].deph[2],
+                    ssr[i].ddeph[0], ssr[i].ddeph[1], ssr[i].ddeph[2],
+                    t1str, ssr[i].dclk[0], ssr[i].dclk[1], ssr[i].dclk[2], ssr[i].hrclk);
 
         int sig_num = 0;
         struct ssr_sig *sig_array = NULL;
@@ -1046,6 +1050,7 @@ static void prssr(vt_t *vt)
 
         p += sprintf(p, "\n");       
     }
+    
     vt_puts(vt,buff);
 }
 /* start command -------------------------------------------------------------*/
