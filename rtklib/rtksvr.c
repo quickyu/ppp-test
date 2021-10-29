@@ -606,7 +606,17 @@ static void read_rtcm_ssr(FILE *fp, gtime_t time, rtksvr_t *svr)
 
     gtime_t ssr_time = rtcm->time;
 
-    while (timediff(ssr_time, time) <= 0) {
+    double dt = timediff(ssr_time, time);
+    if (dt > 0) {
+        trace(3, "read_rtcm_ssr : ssr time lead\n");
+    }
+
+    while (timediff(ssr_time, time) < 0) {
+        char ssr_tstr[64], obs_tstr[64];
+        time2str(ssr_time, ssr_tstr, 0);
+        time2str(time, obs_tstr, 0);
+        trace(3, "read_rtcm_ssr : ssr time %s   obs time %s\n", ssr_tstr, obs_tstr);
+
         for (int i = 0; i < MAXSAT; i++) {
             if (!rtcm->ssr[i].update) 
                 continue;
@@ -619,11 +629,6 @@ static void read_rtcm_ssr(FILE *fp, gtime_t time, rtksvr_t *svr)
             
         ssr_time = rtcm->time;
     }
-
-    char ssr_tstr[64], obs_tstr[64];
-    time2str(rtcm->time, ssr_tstr, 0);
-    time2str(time, obs_tstr, 0);
-    trace(3, "read_rtcm_ssr : ssr time %s   obs time %s\n", ssr_tstr, obs_tstr);
 }
 
 /* rtk server thread ---------------------------------------------------------*/
