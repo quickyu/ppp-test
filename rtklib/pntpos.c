@@ -638,10 +638,9 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     rs=mat(6,n); dts=mat(2,n); var=mat(1,n); azel_=zeros(2,n); resp=mat(1,n);
     
     if (opt_.mode!=PMODE_SINGLE) { /* for precise positioning */
-        //opt_.ionoopt=IONOOPT_BRDC;
-        opt_.ionoopt=IONOOPT_IFLC;
-        //opt_.tropopt=TROPOPT_SAAS;
-        opt_.tropopt=TROPOPT_EST;
+        opt_.ionoopt=IONOOPT_OFF;
+        //opt_.ionoopt=IONOOPT_IFLC;
+        opt_.tropopt=TROPOPT_SAAS;
     }
     /* satellite positons, velocities and clocks */
     satposs(sol->time,obs,n,nav,opt_.sateph,rs,dts,var,svh);
