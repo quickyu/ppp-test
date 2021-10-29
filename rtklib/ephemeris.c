@@ -711,17 +711,17 @@ static int satpos_ssr(gtime_t time, gtime_t teph, int sat, const nav_t *nav,
         return 0;
     }
 
-    //t1 = timediff(time, ssr->t0[0]);
-    //t2 = timediff(time, ssr->t0[1]);
+    t1 = timediff(time, ssr->t0[0]);
+    t2 = timediff(time, ssr->t0[1]);
     //t3 = timediff(time, ssr->t0[2]);
     
     /* ssr orbit and clock correction (ref [4]) */
-    //if (fabs(t1) > MAXAGESSR || fabs(t2) > MAXAGESSR) {
-    //    trace(2,"satpos_ssr : age of ssr error: %s sat=%2d t=%.0f %.0f\n", time_str(time, 0),
-    //          sat,t1,t2);
-    //    *svh = -1;
-    //    return 0;
-    //}
+    if (fabs(t1) > MAXAGESSR || fabs(t2) > MAXAGESSR) {
+        trace(2,"satpos_ssr : age of ssr error: %s sat=%2d t=%.0f %.0f\n", time_str(time, 0),
+              sat,t1,t2);
+        *svh = -1;
+        return 0;
+    }
 
     //if (ssr->udi[0] >= 1.0) 
     //    t1 -= ssr->udi[0]/2.0;
@@ -753,19 +753,19 @@ static int satpos_ssr(gtime_t time, gtime_t teph, int sat, const nav_t *nav,
         return 0;
     
     /* satellite clock for gps, galileo and qzss */
-    //sys = satsys(sat, NULL);
-    //if (sys == SYS_GPS || sys == SYS_GAL || sys == SYS_QZS || sys == SYS_CMP) {
-    //    if (!(eph = seleph(teph, sat, ssr->iode, nav))) 
-    //        return 0;
+    sys = satsys(sat, NULL);
+    if (sys == SYS_GPS || sys == SYS_GAL || sys == SYS_QZS || sys == SYS_CMP) {
+        if (!(eph = seleph(teph, sat, ssr->iode, nav))) 
+            return 0;
         
         /* satellite clock by clock parameters */
-    //    tk = timediff(time, eph->toc);
-    //    dts[0] = eph->f0 + eph->f1*tk + eph->f2*tk*tk;
-    //    dts[1] = eph->f1 + 2.0*eph->f2*tk;
+        tk = timediff(time, eph->toc);
+        dts[0] = eph->f0 + eph->f1*tk + eph->f2*tk*tk;
+        dts[1] = eph->f1 + 2.0*eph->f2*tk;
         
         /* relativity correction */
-    //    dts[0] -= 2.0*dot(rs, rs+3, 3)/CLIGHT/CLIGHT;
-    //}
+        dts[0] -= 2.0*dot(rs, rs+3, 3)/CLIGHT/CLIGHT;
+    }
 
     /* radial-along-cross directions in ecef */
     //if (!normv3(rs+3, ea)) 
