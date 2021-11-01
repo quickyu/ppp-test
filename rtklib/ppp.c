@@ -323,15 +323,22 @@ static int model_phw(gtime_t time, int sat, const char *type, int opt,
 static double varerr(int sat, int sys, double el, int idx, int type,
                      const prcopt_t *opt)
 {
-    double fact=1.0,sinel=sin(el);
+    double fact=1.0, sinel=sin(el);
     
-    if (type==1) fact*=opt->eratio[idx==0?0:1];
-    fact*=sys==SYS_GLO?EFACT_GLO:(sys==SYS_SBS?EFACT_SBS:EFACT_GPS);
+    //if (type==1) fact*=opt->eratio[idx==0?0:1];
+    //fact*=sys==SYS_GLO?EFACT_GLO:(sys==SYS_SBS?EFACT_SBS:EFACT_GPS);
     
-    if (sys==SYS_GPS||sys==SYS_QZS) {
-        if (idx==2) fact*=EFACT_GPS_L5; /* GPS/QZS L5 error factor */
+    //if (sys==SYS_GPS||sys==SYS_QZS) {
+    //    if (idx==2) fact*=EFACT_GPS_L5; /* GPS/QZS L5 error factor */
+    //}
+
+    if (type == 1) {
+        fact *= sys == SYS_GPS ? opt->eratio[0] : opt->eratio[1];
     }
-    if (opt->ionoopt==IONOOPT_IFLC) fact*=3.0;
+    
+    if (opt->ionoopt==IONOOPT_IFLC) 
+        fact*=3.0;
+        
     return SQR(fact*opt->err[1])+SQR(fact*opt->err[2]/sinel);
 }
 /* initialize state and covariance -------------------------------------------*/
