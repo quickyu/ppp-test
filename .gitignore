@@ -6,5 +6,6 @@ rtkrcv/gcc/rtkrcv
 sbf_tools/
 test/
 *.log
+*.stat
 
 
