@@ -72,6 +72,7 @@
 *                           use integer types in stdint.h
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
+#include "data_logger.h"
 
 /* constants and macros ------------------------------------------------------*/
 
@@ -911,6 +912,8 @@ extern void satposs(gtime_t teph, const obsd_t *obs, int n, const nav_t *nav,
               time_str(time[i],6),obs[i].sat,rs[i*6],rs[1+i*6],rs[2+i*6],
               dts[i*2]*1E9,var[i],svh[i]);
     }
+
+    log_satpos(obs, n, time, rs, dts, var, svh);
 }
 /* set selected satellite ephemeris --------------------------------------------
 * Set selected satellite ephemeris for multiple ones like LNAV - CNAV, I/NAV -

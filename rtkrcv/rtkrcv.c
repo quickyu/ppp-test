@@ -49,6 +49,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
+
+#include "data_logger.h"
 #include "rtklib.h"
 #include "vt.h"
 
@@ -1697,6 +1699,9 @@ int main(int argc, char **argv)
         traceopen(TRACEFILE);
         tracelevel(trace);
     }
+
+    init_logger();
+
     /* initialize rtk server and monitor port */
     rtksvrinit(&svr);
     strinit(&moni);
@@ -1771,5 +1776,7 @@ int main(int argc, char **argv)
     //    fprintf(stderr,"navigation data save error: %s\n",NAVIFILE);
     //}
     traceclose();
+    close_logger();
+    
     return 0;
 }

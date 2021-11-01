@@ -48,6 +48,7 @@
 #include <unistd.h>
 
 #include "rtklib.h"
+#include "data_logger.h"
 
 #define MIN_INT_RESET   30000   /* mininum interval of reset command (ms) */
 
@@ -729,20 +730,33 @@ static void *rtksvrthread(void *arg)
                 rtksvrunlock(svr);
             }
 
+            log_ssr(&obs.data[0].time, &svr->nav);
+            log_obs(obs.data, obs.n);
+
             if (svr->rtk.opt.mode >= PMODE_PPP_KINEMA && wait_ssr) {
-                int count = 0;
+                int bds_count = 0, gps_count = 0;
+
                 for (int prn = 19; prn < 47; prn++) {
                     int sat = satno(SYS_CMP, prn);
                     if (svr->nav.ssr[sat-1].t0[0].time != 0 && 
-                            svr->nav.ssr[sat-1].t0[1].time != 0)
-                        count++;    
+                            svr->nav.ssr[sat-1].t0[1].time != 0) {
+                        bds_count++;    
+                    }    
                 }
 
-                if (count > 6) {
-                    trace(3, "rtksvrthread : number of ssr %d\n", count);
+                for (int prn = 1; prn < 38; prn++) {
+                    int sat = satno(SYS_GPS, prn);
+                    if (svr->nav.ssr[sat-1].t0[0].time != 0 && 
+                            svr->nav.ssr[sat-1].t0[1].time != 0) {
+                        gps_count++;    
+                    }    
+                }
+
+                if (bds_count >= 6 && gps_count >= 5) {
+                    trace(3, "rtksvrthread : number of ssr bds: %d  gps: %d\n", bds_count, gps_count);
                     wait_ssr = 0;
                 } else {
-                    trace(3, "rtksvrthread : not enough ssr, %d\n", count);
+                    trace(3, "rtksvrthread : not enough ssr, bds: %d  gps: %d\n", bds_count, gps_count);
                     continue;
                 }    
             } 
