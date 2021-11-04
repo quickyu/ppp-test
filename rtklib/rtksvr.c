@@ -736,23 +736,33 @@ static void *rtksvrthread(void *arg)
             if (svr->rtk.opt.mode >= PMODE_PPP_KINEMA && wait_ssr) {
                 int bds_count = 0, gps_count = 0;
 
-                for (int prn = 19; prn < 47; prn++) {
-                    int sat = satno(SYS_CMP, prn);
-                    if (svr->nav.ssr[sat-1].t0[0].time != 0 && 
-                            svr->nav.ssr[sat-1].t0[1].time != 0) {
-                        bds_count++;    
-                    }    
+                if (svr->rtk.opt.navsys & SYS_CMP) {
+                    for (int prn = 19; prn < 47; prn++) {
+                        int sat = satno(SYS_CMP, prn);
+                        if (svr->nav.ssr[sat-1].t0[0].time != 0 && 
+                                svr->nav.ssr[sat-1].t0[1].time != 0) {
+                            bds_count++;    
+                        }    
+                    }
                 }
 
-                for (int prn = 1; prn < 38; prn++) {
-                    int sat = satno(SYS_GPS, prn);
-                    if (svr->nav.ssr[sat-1].t0[0].time != 0 && 
-                            svr->nav.ssr[sat-1].t0[1].time != 0) {
-                        gps_count++;    
-                    }    
+                if (svr->rtk.opt.navsys & SYS_GPS) {
+                    for (int prn = 1; prn < 38; prn++) {
+                        int sat = satno(SYS_GPS, prn);
+                        if (svr->nav.ssr[sat-1].t0[0].time != 0 && 
+                                svr->nav.ssr[sat-1].t0[1].time != 0) {
+                            gps_count++;    
+                        }    
+                    }
                 }
 
-                if (bds_count >= 6 && gps_count >= 5) {
+                if (svr->rtk.opt.navsys == 33 && bds_count >= 6 && gps_count >= 5) {
+                    trace(3, "rtksvrthread : number of ssr bds: %d  gps: %d\n", bds_count, gps_count);
+                    wait_ssr = 0;
+                } else if (svr->rtk.opt.navsys == 32 && bds_count >= 6) {
+                    trace(3, "rtksvrthread : number of ssr bds: %d  gps: %d\n", bds_count, gps_count);
+                    wait_ssr = 0;
+                } else if (svr->rtk.opt.navsys == 1 && bds_count >= 5) {
                     trace(3, "rtksvrthread : number of ssr bds: %d  gps: %d\n", bds_count, gps_count);
                     wait_ssr = 0;
                 } else {
